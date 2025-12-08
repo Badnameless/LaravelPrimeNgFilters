@@ -1,5 +1,5 @@
 {
-    "name": "francis-beltre/prime-ng-filters",
+    "name": "francis-beltre/laravel-prime-ng-filters",
     "description": "A package to apply PrimeNG filters to your Laravel queries",
     "type": "library",
     "version": "1.0.0",
