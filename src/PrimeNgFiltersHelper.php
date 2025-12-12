@@ -5,7 +5,7 @@ namespace FrancisBeltre\PrimeNgFilters;
 class PrimeNgFiltersHelper
 {
     /**
-     * Get PrimeNG filter rules for validation
+     * Get validation rules for POST requests (PrimeNG native format)
      */
     public static function rules(): array
     {
@@ -25,7 +25,47 @@ class PrimeNgFiltersHelper
             'per_page' => 'nullable|integer|min:1|max:500',
         ];
     }
+
+    /**
+     * Get validation rules for GET requests (accepts JSON strings)
+     */
+    public static function queryRules(): array
+    {
+        return [
+            'filters' => 'nullable|json',
+            'sortField' => 'nullable|string',
+            'sortOrder' => 'nullable|string|in:asc,desc,1,-1',
+            'globalFilter' => 'nullable|string|max:255',
+            'globalFilterFields' => 'nullable|json',
+            'first' => 'nullable|integer|min:0',
+            'rows' => 'nullable|integer|min:1|max:1000',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:500',
+        ];
+    }
     
+    /**
+     * Normalize request data (parses JSON strings if needed)
+     */
+    public static function normalizeRequestData(array $requestData): array
+    {
+        $normalized = [];
+
+        foreach ($requestData as $key => $value) {
+            // If it's a string that looks like JSON, try to decode it
+            if (is_string($value) && (str_starts_with($value, '{') || str_starts_with($value, '['))) {
+                $decoded = json_decode($value, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $normalized[$key] = $decoded;
+                    continue;
+                }
+            }
+            $normalized[$key] = $value;
+        }
+
+        return $normalized;
+    }
+
     /**
      * Extract filters from request data
      */
