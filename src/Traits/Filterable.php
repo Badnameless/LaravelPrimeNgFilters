@@ -19,18 +19,19 @@ trait Filterable
      * @return Builder
      */
     public function scopeApplyPrimeNgFilters(
-        Builder $query, 
+        Builder $query,
         array $requestData,
         $searchableFields = null
     ): Builder {
+
         // Apply individual filters
-        if ($filters = PrimeNgFiltersHelper::getFilters($requestData)) {
+        if ($filters = PrimeNgFiltersHelper::getNormalizedFilters($requestData)) {
             $query = $this->applyFilters($query, $filters);
         }
 
         // Apply global search
         if ($globalFilter = PrimeNgFiltersHelper::getGlobalFilter($requestData)) {
-            $fields = $this->resolveSearchableFields($searchableFields, $requestData);
+            $fields = $requestData['globalFilterFields'];
             if (!empty($fields)) {
                 $query = $this->applyGlobalFilter($query, $globalFilter, $fields);
             }
@@ -45,71 +46,11 @@ trait Filterable
     }
 
     /**
-     * Resolve which searchable fields to use
-     */
-    protected function resolveSearchableFields($searchableFields, array $requestData): array
-    {
-        // Priority 1: Explicitly passed from controller
-        if ($searchableFields !== null) {
-            if ($searchableFields === 'all') {
-                return $this->getAllSearchableColumns();
-            }
-            if (is_array($searchableFields)) {
-                return $searchableFields;
-            }
-        }
-
-        // Priority 2: From request data (if provided)
-        if (isset($requestData['globalFilterFields'])) {
-            return (array) $requestData['globalFilterFields'];
-        }
-
-        // Priority 3: From model property
-        if (property_exists($this, 'searchableFields')) {
-            return $this->searchableFields;
-        }
-
-        // Priority 4: Try to get from model's fillable or visible
-        return $this->getDefaultSearchableFields();
-    }
-
-    /**
-     * Get all database columns for the model (use with caution!)
-     */
-    protected function getAllSearchableColumns(): array
-    {
-        if (method_exists($this, 'getConnection') && method_exists($this, 'getTable')) {
-            try {
-                $columns = $this->getConnection()->getSchemaBuilder()->getColumnListing($this->getTable());
-                return array_diff($columns, ['created_at', 'updated_at', 'deleted_at']);
-            } catch (\Exception $e) {
-                // Fallback to empty array
-            }
-        }
-        return [];
-    }
-
-    /**
-     * Get default searchable fields from model
-     */
-    protected function getDefaultSearchableFields(): array
-    {
-        if (property_exists($this, 'fillable')) {
-            return $this->fillable;
-        }
-        
-        if (property_exists($this, 'visible')) {
-            return $this->visible;
-        }
-        
-        return [];
-    }
-
-    /**
      * Apply individual filters to query
      */
     protected function applyFilters(Builder $query, array $filters): Builder
     {
+
         foreach ($filters as $filter) {
             $query = $this->applyFilter($query, $filter);
         }
@@ -131,18 +72,30 @@ trait Filterable
         }
 
         switch ($operator) {
-            case 'equals': return $query->where($field, $value);
-            case 'contains': return $query->where($field, 'LIKE', "%{$value}%");
-            case 'startsWith': return $query->where($field, 'LIKE', "{$value}%");
-            case 'endsWith': return $query->where($field, 'LIKE', "%{$value}");
-            case 'lt': return $query->where($field, '<', $value);
-            case 'lte': return $query->where($field, '<=', $value);
-            case 'gt': return $query->where($field, '>', $value);
-            case 'gte': return $query->where($field, '>=', $value);
-            case 'in': return $query->whereIn($field, (array) $value);
-            case 'notIn': return $query->whereNotIn($field, (array) $value);
-            case 'between': return $query->whereBetween($field, (array) $value);
-            default: return $query;
+            case 'equals':
+                return $query->where($field, $value);
+            case 'contains':
+                return $query->where($field, 'LIKE', "%{$value}%");
+            case 'startsWith':
+                return $query->where($field, 'LIKE', "{$value}%");
+            case 'endsWith':
+                return $query->where($field, 'LIKE', "%{$value}");
+            case 'lt':
+                return $query->where($field, '<', $value);
+            case 'lte':
+                return $query->where($field, '<=', $value);
+            case 'gt':
+                return $query->where($field, '>', $value);
+            case 'gte':
+                return $query->where($field, '>=', $value);
+            case 'in':
+                return $query->whereIn($field, (array) $value);
+            case 'notIn':
+                return $query->whereNotIn($field, (array) $value);
+            case 'between':
+                return $query->whereBetween($field, (array) $value);
+            default:
+                return $query;
         }
     }
 
@@ -150,8 +103,8 @@ trait Filterable
      * Apply global search across multiple fields
      */
     protected function applyGlobalFilter(
-        Builder $query, 
-        string $searchTerm, 
+        Builder $query,
+        string $searchTerm,
         array $searchableFields
     ): Builder {
         if (empty($searchableFields)) {
@@ -164,7 +117,7 @@ trait Filterable
             }
         });
     }
-    
+
     /**
      * Apply custom filters with configuration
      */
@@ -177,16 +130,16 @@ trait Filterable
             if (!isset($requestData[$field]) || $requestData[$field] === null) {
                 continue;
             }
-            
+
             $value = $requestData[$field];
             $type = $config['type'] ?? 'where';
             $callback = $config['callback'] ?? null;
-            
+
             if ($callback && is_callable($callback)) {
                 $callback($query, $value);
                 continue;
             }
-            
+
             switch ($type) {
                 case 'where':
                     $query->where($field, $value);
@@ -207,7 +160,7 @@ trait Filterable
                     break;
             }
         }
-        
+
         return $query;
     }
 }
